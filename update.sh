@@ -54,7 +54,7 @@ kubectl apply -f all.yaml -n $TARGET_NAMESPACE
 if [ ! -z ${SLACK_INCOMING_WEBHOOK} ]; then
   if [ ! -z ${GITHUB_TO_SLACK_ID_JSON} ]; then
     echo "Notifying commiter's "${DRONE_COMMIT_AUTHOR}" of url availability"
-    SLACK_ID=$(wget -O - ${GITHUB_TO_SLACK_ID_JSON} | jq -r '.'${DRONE_COMMIT_AUTHOR}'')
+    SLACK_ID=$(wget -O - ${GITHUB_TO_SLACK_ID_JSON} | jq -r '.["'${DRONE_COMMIT_AUTHOR}'"]')
     echo "[DEBUG] SLACK_ID is $SLACK_ID"
     curl -X POST -H 'Content-type: application/json' --data '{"text":"<@'$SLACK_ID'>, your feature is ready to be tested at url '$HOST'"}' ${SLACK_INCOMING_WEBHOOK}
   fi

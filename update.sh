@@ -55,7 +55,7 @@ done
 cat resources.yaml ingress.yaml others.yaml > all.yaml
 
 # Creating resources in kubernetes
-$PUSH_TIMESTAMP=$(date --iso-8601=seconds)
+$PUSH_TIMESTAMP=$(date -Iseconds)
 
 kubectl create namespace $TARGET_NAMESPACE || true
 kubectl label namespace $TARGET_NAMESPACE sourceNamespace=$SOURCE_NAMESPACE --overwrite

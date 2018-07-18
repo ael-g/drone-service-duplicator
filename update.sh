@@ -40,15 +40,26 @@ done
 echo > ingress.yaml
 for n in $(kubectl get -o=name ingress -l $MATCH_ON_KEY=$SERVICE_LABEL -n $SOURCE_NAMESPACE)
 do
-    (echo "---") >> resources.yaml
+    (echo "---") >> ingress.yaml
     kubectl get -o=yaml -n $SOURCE_NAMESPACE --export $n | yq -y '. | .spec.rules[].host="'$HOST'" | .spec.tls[].hosts[0]="'$HOST'" | .spec.tls[].secretName="'$HOST'"'>> ingress.yaml
 done
 
-cat resources.yaml ingress.yaml > all.yaml
+# Other resources
+echo > others.yaml
+for n in $(kubectl get -o=name role,clusterrole -l drone-service-duplicator-duplicate-always=true -n $SOURCE_NAMESPACE)
+do
+    (echo "---") >> others.yaml
+    kubectl get -o=yaml -n $SOURCE_NAMESPACE $n | yq -y '. | .metadata.namespace="'$TARGET_NAMESPACE'"' >> others.yaml
+done
+
+cat resources.yaml ingress.yaml others.yaml > all.yaml
 
 # Creating resources in kubernetes
+$PUSH_TIMESTAMP=$(date --iso-8601=seconds)
+
 kubectl create namespace $TARGET_NAMESPACE || true
 kubectl label namespace $TARGET_NAMESPACE sourceNamespace=$SOURCE_NAMESPACE --overwrite
+kubectl label namespace $TARGET_NAMESPACE lastGitPush=$PUSH_TIMESTAMP --overwrite
 kubectl apply -f all.yaml -n $TARGET_NAMESPACE
 
 if [ ! -z ${SLACK_INCOMING_WEBHOOK} ]; then

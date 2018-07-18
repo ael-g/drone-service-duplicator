@@ -46,27 +46,26 @@ done
 
 # Other resources
 echo > others.yaml
-for n in $(kubectl get -o=name role,clusterrole -l drone-service-duplicator-duplicate-always=true -n $SOURCE_NAMESPACE)
+for n in $(kubectl get -o=name role,rolebinding -l drone-service-duplicator-duplicate-always=true -n $SOURCE_NAMESPACE)
 do
     (echo "---") >> others.yaml
-    kubectl get -o=yaml -n $SOURCE_NAMESPACE $n | yq -y '. | .metadata.namespace="'$TARGET_NAMESPACE'"' >> others.yaml
+    kubectl get -o=yaml -n $SOURCE_NAMESPACE $n | yq -y '. | .metadata.namespace="'$TARGET_NAMESPACE'" | del(.metadata.creationTimestamp) | del(.metadata.resourceVersion) | del(.metadata.selfLink) | del(.metadata.uid)' >> others.yaml
 done
 
 cat resources.yaml ingress.yaml others.yaml > all.yaml
 
 # Creating resources in kubernetes
-$PUSH_TIMESTAMP=$(date -Iseconds)
+PUSH_TIMESTAMP=$(date -Iseconds)
 
 kubectl create namespace $TARGET_NAMESPACE || true
-kubectl label namespace $TARGET_NAMESPACE sourceNamespace=$SOURCE_NAMESPACE --overwrite
-kubectl label namespace $TARGET_NAMESPACE lastGitPush=$PUSH_TIMESTAMP --overwrite
+kubectl label namespace $TARGET_NAMESPACE sourceNamespace="$SOURCE_NAMESPACE" --overwrite
+kubectl annotate namespace $TARGET_NAMESPACE lastGitPush="$PUSH_TIMESTAMP" --overwrite
 kubectl apply -f all.yaml -n $TARGET_NAMESPACE
 
 if [ ! -z ${SLACK_INCOMING_WEBHOOK} ]; then
   if [ ! -z ${GITHUB_TO_SLACK_ID_JSON} ]; then
     echo "Notifying commiter's "${DRONE_COMMIT_AUTHOR}" of url availability"
     SLACK_ID=$(wget -O - ${GITHUB_TO_SLACK_ID_JSON} | jq -r '.["'${DRONE_COMMIT_AUTHOR}'"]')
-    echo "[DEBUG] SLACK_ID is $SLACK_ID"
     curl -X POST -H 'Content-type: application/json' --data '{"text":"<@'$SLACK_ID'>, your feature is ready to be tested at url '$HOST'"}' ${SLACK_INCOMING_WEBHOOK}
   fi
 fi

@@ -24,24 +24,31 @@ kubectl config use-context default
 #SERVICE_LABEL=app
 #MATCH_ON_KEY=repo
 #HOST=feature-test.habx-dev.fr
+#ADDITIONAL_SERVICES
 
 HOST=$( echo $HOST | tr '[:upper:]' '[:lower:]')
 TARGET_NAMESPACE=$( echo $TARGET_NAMESPACE | tr '[:upper:]' '[:lower:]')
 
+ALL_SERVICES="$ADDITIONAL_SERVICES $SERVICE_LABEL"
+
 # Deployments and service
 echo > resources.yaml
-for n in $(kubectl get -o=name service,deployment -l $MATCH_ON_KEY=$SERVICE_LABEL -n $SOURCE_NAMESPACE)
-do
-    (echo "---") >> resources.yaml
-    kubectl get -o=yaml -n $SOURCE_NAMESPACE --export $n >> resources.yaml
-done
-
-# Ingress rules
 echo > ingress.yaml
-for n in $(kubectl get -o=name ingress -l $MATCH_ON_KEY=$SERVICE_LABEL -n $SOURCE_NAMESPACE)
+
+for additionalService in $ALL_SERVICES
 do
-    (echo "---") >> ingress.yaml
-    kubectl get -o=yaml -n $SOURCE_NAMESPACE --export $n | yq -y '. | .spec.rules[].host="'$HOST'" | .spec.tls[].hosts[0]="'$HOST'" | .spec.tls[].secretName="'$HOST'"'>> ingress.yaml
+  for n in $(kubectl get -o=name service,deployment -l $MATCH_ON_KEY=$additionalService -n $SOURCE_NAMESPACE)
+  do
+      (echo "---") >> resources.yaml
+      kubectl get -o=yaml -n $SOURCE_NAMESPACE --export $n >> resources.yaml
+  done
+
+  # Ingress rules
+  for n in $(kubectl get -o=name ingress -l $MATCH_ON_KEY=$additionalService -n $SOURCE_NAMESPACE)
+  do
+      (echo "---") >> ingress.yaml
+      kubectl get -o=yaml -n $SOURCE_NAMESPACE --export $n | yq -y '. | .spec.rules[].host="'$HOST'" | .spec.tls[].hosts[0]="'$HOST'" | .spec.tls[].secretName="'$HOST'"'>> ingress.yaml
+  done
 done
 
 # Other resources
